@@ -33,7 +33,7 @@ const serverInfo = {
         nextRun: '⏭',
         passcode: '🔑',
     },
-    id: 'bots discord id',
+    id: 'server id',
     posts: {
         schedule: 'schedule post id',
     },
