@@ -75,7 +75,8 @@ function getServerTime(targetTime) {
     return addZero(currentDate.getUTCHours()) + ':' + addZero(currentDate.getUTCMinutes()) + ' ST';
 }
 function adminLog(String) {
-    client.channels.cache.get(serverInfo.channels.log).send(`[` + getServerTime() + `] ` + String);
+    // client.channels.cache.get(serverInfo.channels.log).send(`[` + getServerTime() + `] ` + String);
+    console.log(`[` + getServerTime() + `] ` + String);
 }
 function commandError(message, reply) {
     message.reply(reply).then((msg) => {
@@ -309,6 +310,21 @@ function buildPartyLeaderEmbed(run) {
     return embed;
 }
 
+//Hash Function
+Object.defineProperty(String.prototype, 'hashCode', {
+    value: function () {
+        var hash = 0,
+            i,
+            chr;
+        for (i = 0; i < this.length; i++) {
+            chr = this.charCodeAt(i);
+            hash = (hash << 5) - hash + chr;
+            hash |= 0; // Convert to 32bit integer
+        }
+        return hash;
+    },
+});
+
 //Timed Functions
 function clockFunctions() {
     let currentDate = new Date();
@@ -336,18 +352,20 @@ function clockFunctions() {
                 if (embedDescription === '') {
                     embedDescription = 'There are currently no scheduled runs.\nPlease check back here shortly for further information.';
                 }
-                let embedSchedule = new Discord.MessageEmbed()
-                    .setColor(serverInfo.embedColor)
-                    .setTitle('Upcoming Runs')
-                    .setDescription(embedDescription)
-                    .setThumbnail('https://rosaworks.uk/img/ozma.png')
-                    .addField(
-                        'Run Eligibility',
-                        'Each run type listed below shows the roles able to take part in this run.\nOpen: New Adventurer, Ozma Progression, Ozma Killer,' +
-                            '\nOZ: Ozma Progression, Ozma Killer,\nRC: Ozma Killer.'
-                    );
+                let embedHash = embedDescription.hashCode();
                 channelSchedule.messages.fetch(serverInfo.posts.schedule).then((msg) => {
-                    if (!msg.embeds[0].description.includes(embedDescription)) {
+                    if (!msg.embeds[0].description.includes(embedHash)) {
+                        embedDescription += '\n\nPost Hash: ' + embedHash;
+                        let embedSchedule = new Discord.MessageEmbed()
+                            .setColor(serverInfo.embedColor)
+                            .setTitle('Upcoming Runs')
+                            .setDescription(embedDescription)
+                            .setThumbnail('https://rosaworks.uk/img/ozma.png')
+                            .addField(
+                                'Run Eligibility',
+                                'Each run type listed below shows the roles able to take part in this run.\nOpen: New Adventurer, Ozma Progression, Ozma Killer,' +
+                                    '\nOZ: Ozma Progression, Ozma Killer,\nRC: Ozma Killer.'
+                            );
                         msg.edit(embedSchedule);
                     }
                 });
@@ -708,12 +726,24 @@ client.on('message', (msg) => {
                 if (currentRoles.includes(serverInfo.roles.flex.ozmaKiller)) {
                     roleIndex = currentRoles.indexOf(serverInfo.roles.flex.ozmaKiller);
                 }
-                if (roleIndex !== '' && roleIndex !== currentRoles.indexOf(newRole)) {
-                    currentRoles[roleIndex] = newRole;
-                    msg.member.roles.set(currentRoles);
+                if (currentRoles.length === 0) {
+                    msg.member.roles.add(newRole);
                     msg.react(serverInfo.emoji.roleApplied);
                     adminLog(`Changed Progression Role for ${msg.member.displayName} to ${roleApplied}`);
                     return;
+                } else if (roleIndex !== '' && roleIndex !== currentRoles.indexOf(newRole)) {
+                    currentRoles[roleIndex] = newRole;
+                    msg.member.roles
+                        .set(currentRoles)
+                        .then((addRole) => {
+                            msg.react(serverInfo.emoji.roleApplied);
+                            adminLog(`Changed Progression Role for ${msg.member.displayName} to ${roleApplied}`);
+                            return;
+                        })
+                        .catch((error) => {
+                            msg.react(serverInfo.emoji.hourglass);
+                            adminLog(error);
+                        });
                 }
             } else if (roleString.includes('eureka pings')) {
                 if (currentRoles.includes(serverInfo.roles.trigger.relicGrind)) {
